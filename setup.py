@@ -10,10 +10,7 @@ def initiate_model(device):
     return model
 
 def load_features(_class_, args):
-    if "inf" in args.phase:
-        reference_features = np.load(args.save_path + f"db_features_inf_retrieval_{_class_}.npy").astype(np.float32)
-    else:
-        reference_features = np.load(args.save_path + f"db_features_retrieval_{_class_}.npy")
+    reference_features = np.load(args.save_path + f"db_features_{_class_}.npy")
     return reference_features
 
 def train_data(args, _class_):

@@ -29,8 +29,8 @@ def retrieval(args):
 
         # Convert the list of features to a numpy array and save
         features_db = np.vstack(features_list)
-        np.save(args.save_path + 'db_features_'+ args.phase + '_' + item + '.npy', features_db)
-        print(f"Features saved to db_features_{args.phase}_{item}.npy")
+        np.save(args.save_path + 'db_features_' + item + '.npy', features_db)
+        print(f"Features saved to db_features_{item}.npy")
 
 def find_similar_images(query_feature, reference_features):
     """

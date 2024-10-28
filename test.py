@@ -6,7 +6,7 @@ from visualize import visualize_reconstruction
 from sklearn.metrics import roc_auc_score
 from retrieval import find_similar_images
 from setup import initiate_model, test_data, load_features
-from utils import denormalize, create_directory_structure, compute_anomaly_map, compute_anomaly_score, highlight_anomaly, post_process_reconstruction
+from utils import denormalize, create_directory_structure, compute_anomaly_map, compute_anomaly_score, highlight_anomaly
 
 def test(_class_, args, device):
     # Initialize WandB
@@ -30,16 +30,11 @@ def test(_class_, args, device):
     encoder = model.encode
     decoder = model.decode
     
-    best_inputs = []
-    best_recons = []
-    best_anomaps = []
-    best_anomalys = []
-    best_labels = []
     all_labels = []
     anomap_scores = []
     anomaly_scores = []
     
-    test_output_dirs = create_directory_structure(args.output_path, args.phase, args.item_list)
+    test_output_dirs = create_directory_structure(args.output_path, args.phase, ckpt_file, args.item_list)
     dataloader = test_data(args, _class_,)
     reference_features = load_features(_class_, args)
 
@@ -80,6 +75,18 @@ def test(_class_, args, device):
             anomaly_scores.extend(anomaly_score.cpu().numpy())
             all_labels.extend(labels.cpu().numpy().astype(int))
 
+            for j in range(inputs.size(0)):
+                save_path = os.path.join(test_output_dirs[_class_], f'{_class_}_{i}{j}.png')
+                visualize_reconstruction(
+                    inputs[j].unsqueeze(0),  # Add batch dimension for each image
+                    recon_image[j].unsqueeze(0),
+                    anomaly_map[j].unsqueeze(0),
+                    highlighted_image[j].unsqueeze(0),
+                    args,
+                    save_path
+                )            
+                wandb.log({"output_images": wandb.Image(save_path)})
+
             # Compute ROC AUC score for anomaly detection
             gt_mask = masks.cpu().numpy().astype(int)
             pred_ano_map = anomaly_map.cpu().numpy()
@@ -88,11 +95,7 @@ def test(_class_, args, device):
                 if np.unique(gt_mask[b]).size > 1:
                     anomap_score = roc_auc_score(gt_mask[b].reshape(-1), pred_ano_map[b].reshape(-1))
                     anomap_scores.append(anomap_score)
-        
-        # Save the best reconstructions and highlighted anomalies
-        save_path = os.path.join(test_output_dirs[_class_], f'{_class_}_result_{i}.png')
-        visualize_reconstruction(inputs, recon_image.detach(), anomaly_map.detach(), highlighted_image.detach(), args, save_path)
-
+            
     # Compute AUROC score
     anomap_scores = np.array(anomap_scores)
     anomaly_scores = np.array(anomaly_scores)
@@ -104,9 +107,6 @@ def test(_class_, args, device):
     # Log AUROC scores to WandB and MLflow
     wandb.log({"anomap_auroc": mean_anomap_score, "auroc": auroc_score})
     
-    # Log images to WandB
-    wandb.log({"best_images": wandb.Image(save_path)})
-    
     # Save the scores to a file
     with open(args.score_path, 'a') as file:
         file.write(f'{_class_} class, Zero Shot, Anomaly Map AUROC: {mean_anomap_score}, AUROC Score: {auroc_score}\n')
@@ -115,5 +115,5 @@ def test(_class_, args, device):
     print(f'AUROC Score = {auroc_score}')
     print(f"Testing on {_class_} finished")
 
-    # End WandB and MLflow runs
+    # End WandB
     wandb.finish()

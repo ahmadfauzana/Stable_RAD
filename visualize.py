@@ -14,10 +14,10 @@ def visualize_reconstruction(inputs, recon_image, anomaly_map, highlighted_image
         raise ValueError(f"Expected inputs to be 3D or 4D, but got shape: {inputs.shape}")
 
     # Process reconstructed images and highlighted images
-    recon_image = recon_image.cpu().numpy().transpose(0, 2, 3, 1) * np.array(args.std) + np.array(args.mean)
+    recon_image = recon_image.cpu().numpy().transpose(0, 2, 3, 1)
     highlighted_image = highlighted_image.cpu().numpy().transpose(0, 2, 3, 1)
 
-    # Process anomaly map
+    # Process anomaly map and normalize for visualization
     anomaly_map = anomaly_map.cpu().numpy()
     if anomaly_map.ndim == 4 and anomaly_map.shape[1] == 1:
         anomaly_map = anomaly_map.squeeze(1)
@@ -60,12 +60,12 @@ def visualize_reconstruction(inputs, recon_image, anomaly_map, highlighted_image
         axs[i, 3].axis('off')
 
         # Highlighted Anomaly (blend original and anomaly mask)
-        highlighted_image = np.copy(inputs[i])
-        alpha = 0.5  # Blending factor
+        highlighted_img = np.copy(inputs[i])
+        alpha = args.alpha if hasattr(args, 'alpha') else 0.5  # Default blending factor if not provided
         anomaly_areas = binary_anomaly_mask[i] == 1
-        highlighted_image[anomaly_areas] = (1 - alpha) * highlighted_image[anomaly_areas] + alpha * np.array([1, 0, 0])
+        highlighted_img[anomaly_areas] = (1 - alpha) * highlighted_img[anomaly_areas] + alpha * np.array([1, 0, 0])
 
-        axs[i, 4].imshow(np.clip(highlighted_image, 0, 1))
+        axs[i, 4].imshow(np.clip(highlighted_img, 0, 1))
         axs[i, 4].set_title(f'Highlighted {i}')
         axs[i, 4].axis('off')
 

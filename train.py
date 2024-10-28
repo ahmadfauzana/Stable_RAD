@@ -26,7 +26,7 @@ def train(_class_, args, device):
     else:
         print("No checkpoint found, starting from scratch.")
 
-    train_output_dirs = create_directory_structure(args.output_path, args.phase, args.item_list)
+    train_output_dirs = create_directory_structure(args.output_path, args.phase, ckpt_file, args.item_list)
 
     # Initialize optimizer and scheduler
     optimizer = AdamW(model.parameters(), lr=0.005, betas=(0.5, 0.999))
@@ -40,7 +40,7 @@ def train(_class_, args, device):
         epoch_loss = 0
         epoch_anomaly_scores = []
 
-        for i, (images, labels) in tqdm(enumerate(train_dataloader)):
+        for i, (images, labels) in tqdm.tqdm(enumerate(train_dataloader)):
             torch.cuda.empty_cache()
             inputs = images
             inputs = inputs.to(device)
@@ -85,7 +85,7 @@ def train(_class_, args, device):
 
         # Visualize images at the end of each epoch
         save_path = os.path.join(train_output_dirs[_class_], f'{_class_}_epoch_{epoch+1}.png')
-        visualize_reconstruction(inputs, outputs.detach(), anomaly_map.detach(), highlighted_image.detach(), labels, args, save_path)
+        visualize_reconstruction(inputs, outputs.detach(), anomaly_map.detach(), highlighted_image.detach(), args, save_path)
 
         # Print average loss and anomaly scores for the epoch
         average_loss = epoch_loss / len(train_dataloader)
@@ -97,7 +97,7 @@ def train(_class_, args, device):
 
         # Log the output
         wandb.log({"loss": average_loss, "auroc": average_anomaly_score})
-        wandb.log({"best_images": wandb.Image(save_path)})
+        wandb.log({"output_images": wandb.Image(save_path)})
 
         # Step the scheduler
         scheduler.step()

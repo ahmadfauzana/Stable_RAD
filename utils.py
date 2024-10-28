@@ -75,7 +75,7 @@ def loss_function(a, b):
     )
     return loss
 
-def create_directory_structure(output_dir, phase, item_list):
+def create_directory_structure(output_dir, phase, ckpt_file, item_list):
     """
     Creates the directory structure and returns the path to store the visualization.
     
@@ -97,14 +97,21 @@ def create_directory_structure(output_dir, phase, item_list):
     if not os.path.exists(phase_dir):
         os.makedirs(phase_dir)
 
-    # Create subfolders for each item in the item list under the phase folder
+    if os.path.exists(ckpt_file):
+        ckpt_dir = os.path.join(phase_dir, "ckpt")
+        if not os.path.exists(ckpt_dir):
+            os.makedirs(ckpt_dir)
+    else:
+        ckpt_dir = os.path.join(phase_dir, "zero")
+        if not os.path.exists(ckpt_dir):
+            os.makedirs(ckpt_dir)
+    
     output_dirs = {}
     for item in item_list:
-        item_dir = os.path.join(phase_dir, item)
+        item_dir = os.path.join(ckpt_dir, item)
         if not os.path.exists(item_dir):
             os.makedirs(item_dir)
         
-        # Store the path for saving images for this item
         output_dirs[item] = item_dir
     
     return output_dirs
@@ -128,6 +135,12 @@ def get_args():
     parser.add_argument('--epochs', type=int, default=50, help="Number of training epochs")
     parser.add_argument('--image_size', type=int, default=256, help="Size of the input image")
     parser.add_argument('--threshold', type=float, default=0.1, help="Number of threshold")
+    parser.add_argument('--batch_size', type=int, default=32, help="Batch size")
+    parser.add_argument('--lr', type=float, default=0.001, help="Learning rate")
+    parser.add_argument('--weight_decay', type=float, default=0.0005, help="weight decay")
+    parser.add_argument('--momentum', type=float, default=0.9, help="momentum")
+    parser.add_argument('--num_workers', type=int, default=4, help="Number of workers")
+    parser.add_argument('--alpha', type=float, default=0.5, help="Alpha number")
     
     # Normalization
     parser.add_argument('--mean', nargs='+', type=float, default=[0.5, 0.5, 0.5], help="Mean normalization for training")
