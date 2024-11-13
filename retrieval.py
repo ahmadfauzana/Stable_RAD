@@ -29,6 +29,8 @@ def retrieval(args):
 
         # Convert the list of features to a numpy array and save
         features_db = np.vstack(features_list)
+        if not os.path.exists(os.path.dirname(args.save_path)):
+            os.makedirs(os.path.dirname(args.save_path))
         np.save(args.save_path + 'db_features_' + item + '.npy', features_db)
         print(f"Features saved to db_features_{item}.npy")
 

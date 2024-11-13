@@ -21,8 +21,18 @@ if __name__ == '__main__':
     
     args.score_path = os.path.join(args.score_path, 'anomaly_scores.txt')
     
-    with open(args.score_path, 'a') as file:
-        file.write(f"Running in {args.phase} phase started\n")
+    # Create the parent directory if it does not exist
+    directory = os.path.dirname(args.score_path)
+    if not os.path.exists(directory):
+        os.makedirs(directory)
+        
+    if not os.path.exists(args.score_path):
+        with open(args.score_path, 'w') as file:
+            file.write(f"Running in {args.phase} phase started\n")
+    else:
+        with open(args.score_path, 'a') as file:
+            file.write(f"Running in {args.phase} phase started\n")
+
     print(f"Running in {args.phase} phase started")
     
     if args.phase == 'train':
