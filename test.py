@@ -101,18 +101,21 @@ def test(_class_, args, device):
     anomaly_scores = np.array(anomaly_scores)
     all_labels = np.array(all_labels)
 
-    mean_anomap_score = np.mean(anomap_scores) if len(anomap_scores) > 0 else None
-    auroc_score = roc_auc_score(all_labels, anomaly_scores)
+    pixel_wise = np.mean(anomap_scores) if len(anomap_scores) > 0 else None
+    image_wise = roc_auc_score(all_labels, anomaly_scores)
     
     # Log AUROC scores to WandB and MLflow
-    wandb.log({"anomap_auroc": mean_anomap_score, "auroc": auroc_score})
+    wandb.log({"pixel-wise auroc": pixel_wise, "image-wise auroc": image_wise})
     
     # Save the scores to a file
     with open(args.score_path, 'a') as file:
-        file.write(f'{_class_} class, Zero Shot, Anomaly Map AUROC: {mean_anomap_score}, AUROC Score: {auroc_score}\n')
-    
-    print(f'Anomaly Map Score = {mean_anomap_score}')
-    print(f'AUROC Score = {auroc_score}')
+        if os.path.exists(ckpt_file):
+            file.write(f'{_class_} class with Checkpoint, Pixel-wise AUROC: {pixel_wise}, Image-wise Score: {image_wise}\n')
+        else:
+            file.write(f'{_class_} class with Retrieval Only, Pixel-wise AUROC: {pixel_wise}, Image-wise Score: {image_wise}\n')
+            
+    print(f'Pixel-wise AUROC = {pixel_wise}')
+    print(f'Image-wise AUROC = {image_wise}')
     print(f"Testing on {_class_} finished")
 
     # End WandB
