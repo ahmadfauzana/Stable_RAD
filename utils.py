@@ -147,11 +147,11 @@ def get_args():
     parser.add_argument('--std', nargs='+', type=float, default=[0.5, 0.5, 0.5], help="Standard deviation normalization for training")
     
     # Paths
-    parser.add_argument('--root_path', type=str, default="D:\\Fauzan\\Study PhD\\Research\\Stable_RAD\\dataset\\", help="Root path for dataset")
-    parser.add_argument('--ckpt_path', type=str, default="D:\\Fauzan\\Study PhD\\Research\\Stable_RAD\\checkpoint\\", help="Checkpoint path")
-    parser.add_argument('--save_path', type=str, default="D:\\Fauzan\\Study PhD\\Research\\Stable_RAD\\features\\", help="Save image features path")
-    parser.add_argument('--output_path', type=str, default="D:\\Fauzan\\Study PhD\\Research\\Stable_RAD\\output\\", help="Output visualization path")
-    parser.add_argument('--score_path', type=str, default="D:\\Fauzan\\Study PhD\\Research\\Stable_RAD\\", help="Path to save anomaly scores")
+    parser.add_argument('--root_path', type=str, default="D:\\Fauzan\\StudyPhD\\Research\\Stable_RAD\\dataset\\", help="Root path for dataset")
+    parser.add_argument('--ckpt_path', type=str, default="D:\\Fauzan\\StudyPhD\\Research\\Stable_RAD\\checkpoint\\", help="Checkpoint path")
+    parser.add_argument('--save_path', type=str, default="D:\\Fauzan\\StudyPhD\\Research\\Stable_RAD\\features\\", help="Save image features path")
+    parser.add_argument('--output_path', type=str, default="D:\\Fauzan\\StudyPhD\\Research\\Stable_RAD\\output\\", help="Output visualization path")
+    parser.add_argument('--score_path', type=str, default="D:\\Fauzan\\StudyPhD\\Research\\Stable_RAD\\", help="Path to save anomaly scores")
     
     # Phase and DMAD (train or test)
     parser.add_argument('--phase', type=str, choices=['train', 'test', 'retrieval', 'inf_train', 'inf_test', 'inf_retrieval'], default='train', help="Phase of the process: retrieval, train, or test")

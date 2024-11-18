@@ -4,7 +4,7 @@ import wandb
 import numpy as np
 from visualize_try import visualize_reconstruction
 from sklearn.metrics import roc_auc_score
-from metrics_try1 import compute_multi_scale_anomaly_map, smooth_anomaly_map, apply_adaptive_threshold, find_similar_images
+from metrics import compute_anomaly_map, compute_anomaly_score, find_similar_images
 from setup import initiate_model, test_data, load_features
 from utils import denormalize, create_directory_structure
 
@@ -63,10 +63,8 @@ def test(_class_, args, device):
             recon_image = denormalize(recon_image, args.mean, args.std)
 
             # Enhanced anomaly map and score calculation
-            anomaly_map = compute_multi_scale_anomaly_map(inputs, recon_image)
-            print(f"Anomaly map shape before smoothing: {anomaly_map.shape}")
-            anomaly_map = smooth_anomaly_map(anomaly_map, kernel_size=5, sigma=1.5)
-            anomaly_map = apply_adaptive_threshold(anomaly_map)
+            anomaly_map = compute_anomaly_map(inputs, recon_image)
+            anomaly_score = compute_anomaly_score(inputs, recon_image)
 
             anomaly_score = anomaly_map.mean(dim=[1, 2, 3])
 

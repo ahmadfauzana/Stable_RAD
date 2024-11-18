@@ -41,7 +41,8 @@ def visualize_reconstruction(inputs, recon_image, anomaly_map, gt_mask, args, sa
         # Convert the normalized anomaly map to a 3-channel heatmap
         anomaly_heatmap = np.zeros((*anomaly_map_normalized.shape, 3))
         for i in range(anomaly_map_normalized.shape[0]):
-            anomaly_heatmap[i] = plt.cm.jet(anomaly_map_normalized[i])[:, :, :3]  # Remove alpha channel
+            # Get the RGB channels only, discarding the alpha channel (index 3)
+            anomaly_heatmap[i] = plt.cm.jet(anomaly_map_normalized[i])[:, :, :3]
 
         # Blend anomaly heatmap with the original image
         overlayed_images = 0.7 * inputs + 0.3 * anomaly_heatmap  # Adjust blending ratio as desired
