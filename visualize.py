@@ -1,7 +1,7 @@
 import numpy as np
 import matplotlib.pyplot as plt
 
-def visualize_reconstruction(inputs, recon_image, anomaly_map, highlighted_image, args, save_path):
+def visualize_reconstruction(inputs, recon_image, anomaly_map, gt_mask, args, save_path):
     """Visualize original images, binary anomaly masks, anomaly maps, reconstructed images, and highlighted anomalies, then save the figure horizontally."""
     
     # Convert inputs to numpy arrays and denormalize
@@ -15,7 +15,7 @@ def visualize_reconstruction(inputs, recon_image, anomaly_map, highlighted_image
 
     # Process reconstructed images and highlighted images
     recon_image = recon_image.cpu().numpy().transpose(0, 2, 3, 1)
-    highlighted_image = highlighted_image.cpu().numpy().transpose(0, 2, 3, 1)
+    gt_mask = gt_mask.squeeze().cpu().numpy()
 
     # Process anomaly map and normalize for visualization
     anomaly_map = anomaly_map.cpu().numpy()
@@ -27,11 +27,8 @@ def visualize_reconstruction(inputs, recon_image, anomaly_map, highlighted_image
     anomaly_map_max = anomaly_map.max(axis=(1, 2), keepdims=True)
     anomaly_map_normalized = (anomaly_map - anomaly_map_min) / (anomaly_map_max - anomaly_map_min + 1e-6) * 255
 
-    # Create a binary anomaly mask for overlay
-    binary_anomaly_mask = (anomaly_map > args.threshold).astype(np.uint8)
-
     B = len(inputs)  # Batch size
-    fig, axs = plt.subplots(B, 5, figsize=(25, 15))  # Set the layout to horizontal (batch in rows, images in columns)
+    fig, axs = plt.subplots(B, 4, figsize=(25, 15))  # Set the layout to horizontal (batch in rows, images in columns)
 
     if len(inputs) == 1:
         axs = np.expand_dims(axs, axis=0)
@@ -42,11 +39,9 @@ def visualize_reconstruction(inputs, recon_image, anomaly_map, highlighted_image
         axs[i, 0].set_title(f'Original {i}')
         axs[i, 0].axis('off')
 
-        # Binary Anomaly Mask Overlay
-        overlay_image = np.copy(inputs[i])
-        overlay_image[binary_anomaly_mask[i] == 1] = [1, 0, 0]  # Red overlay
-        axs[i, 1].imshow(np.clip(overlay_image, 0, 1))
-        axs[i, 1].set_title(f'Binary Anomaly Mask {i}')
+        # Ground Truth
+        axs[i, 1].imshow(gt_mask, cmap='gray')
+        axs[i, 1].set_title(f'Ground Truth {i}')
         axs[i, 1].axis('off')
 
         # Anomaly Map (as heatmap)
@@ -58,16 +53,6 @@ def visualize_reconstruction(inputs, recon_image, anomaly_map, highlighted_image
         axs[i, 3].imshow(np.clip(recon_image[i], 0, 1))
         axs[i, 3].set_title(f'Reconstructed {i}')
         axs[i, 3].axis('off')
-
-        # Highlighted Anomaly (blend original and anomaly mask)
-        highlighted_img = np.copy(inputs[i])
-        alpha = args.alpha if hasattr(args, 'alpha') else 0.5  # Default blending factor if not provided
-        anomaly_areas = binary_anomaly_mask[i] == 1
-        highlighted_img[anomaly_areas] = (1 - alpha) * highlighted_img[anomaly_areas] + alpha * np.array([1, 0, 0])
-
-        axs[i, 4].imshow(np.clip(highlighted_img, 0, 1))
-        axs[i, 4].set_title(f'Highlighted {i}')
-        axs[i, 4].axis('off')
 
     # Adjust layout to fit everything properly
     plt.tight_layout()

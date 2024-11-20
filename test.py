@@ -6,7 +6,7 @@ from visualize import visualize_reconstruction
 from sklearn.metrics import roc_auc_score
 from retrieval import find_similar_images
 from setup import initiate_model, test_data, load_features
-from utils import denormalize, create_directory_structure, compute_anomaly_map, compute_anomaly_score, highlight_anomaly
+from utils import denormalize, create_directory_structure, compute_anomaly_map, compute_anomaly_score
 
 def test(_class_, args, device):
     # Initialize WandB
@@ -69,7 +69,6 @@ def test(_class_, args, device):
             # Compute anomaly map and anomaly score
             anomaly_map = compute_anomaly_map(inputs, recon_image)
             anomaly_score = compute_anomaly_score(inputs, recon_image)
-            highlighted_image = highlight_anomaly(inputs, recon_image, anomaly_map)
 
             # Extend results
             anomaly_scores.extend(anomaly_score.cpu().numpy())
@@ -81,7 +80,7 @@ def test(_class_, args, device):
                     inputs[j].unsqueeze(0),  # Add batch dimension for each image
                     recon_image[j].unsqueeze(0),
                     anomaly_map[j].unsqueeze(0),
-                    highlighted_image[j].unsqueeze(0),
+                    masks[j].unsqueeze(0),
                     args,
                     save_path
                 )            
