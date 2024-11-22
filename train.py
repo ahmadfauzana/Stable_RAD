@@ -8,7 +8,7 @@ from retrieval import find_similar_images
 from visualize import visualize_reconstruction
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from setup import train_data, initiate_model, load_features
-from utils import denormalize, loss_function, compute_anomaly_map, compute_anomaly_score, highlight_anomaly, create_directory_structure
+from utils import denormalize, loss_function, compute_anomaly_map, compute_anomaly_score, create_directory_structure
 
 def train(_class_, args, device):
     wandb.init(project="stable_rad", entity="afauzanaqil", name=f"train_{_class_}")

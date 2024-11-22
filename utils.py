@@ -24,42 +24,6 @@ def compute_anomaly_map(original, reconstructed):
     anomaly_map = F.interpolate(anomaly_map, size=original.shape[2:], mode='bilinear', align_corners=False)
     return anomaly_map
 
-def highlight_anomaly(original, reconstructed, anomaly_map, threshold=0.1):
-    """Highlight anomalous regions in the reconstructed images based on the anomaly map."""
-    # Ensure that all tensors have the same number of channels (3 channels for RGB images)
-    if original.shape[1] != 3:
-        original = original.repeat(1, 3, 1, 1)  # Repeat grayscale to RGB if needed
-    if reconstructed.shape[1] != 3:
-        reconstructed = reconstructed.repeat(1, 3, 1, 1)  # Ensure 3 channels in reconstruction
-    
-    mask = anomaly_map > threshold  # Threshold the difference for significant anomalies
-    mask = mask.float()
-    
-    # Ensure the mask has the correct number of channels for RGB (3 channels)
-    if mask.shape[1] == 1:  # If it's a single-channel mask, replicate to 3 channels
-        anomaly_highlight = torch.cat([mask, mask, mask], dim=1)
-    else:
-        anomaly_highlight = mask  # Use the mask if it already has 3 channels
-    
-    # Overlay the highlighted anomaly on the reconstructed image
-    highlighted_anomaly = original * (1 - anomaly_highlight) + reconstructed * anomaly_highlight
-    return highlighted_anomaly
-
-def post_process_reconstruction(recon_image, anomaly_map):
-    """
-    Post-process the reconstructed image by blending the anomalous regions.
-    A basic denoising technique can be applied here.
-    """
-    threshold = 0.5  # Define a threshold to consider an area anomalous
-    mask = (anomaly_map > threshold).float()
-    
-    # Apply a basic blurring filter to smooth anomalous regions
-    blurred_recon = Func.gaussian_blur(recon_image, kernel_size=5)
-    
-    # Blend original and blurred images, keeping the normal parts intact
-    recon_image = recon_image * (1 - mask) + blurred_recon * mask
-    return recon_image
-
 def loss_function(a, b):
     mse_loss = torch.nn.MSELoss()
     cos_loss = torch.nn.CosineSimilarity()

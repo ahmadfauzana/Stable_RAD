@@ -25,7 +25,7 @@ def ssim(original_patch, reconstructed_patch, C1=0.01**2, C2=0.03**2):
     ssim_score = edge_score * (1 + edge_weight)  # Higher score if edges align better
     return ssim_score
 
-def compute_anomaly_map(original, reconstructed, patch_size=16, smooth_factor=3, similarity_threshold=0.8): 
+def compute_anomaly_map(original, reconstructed, patch_size=16, similarity_threshold=0.8): 
     """
     Calculate SSIM-based anomaly map using a patch-based approach with shape matching.
     """
