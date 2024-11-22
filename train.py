@@ -8,7 +8,9 @@ from retrieval import find_similar_images
 from visualize import visualize_reconstruction
 from torch.optim.lr_scheduler import CosineAnnealingLR
 from setup import train_data, initiate_model, load_features
-from utils import denormalize, loss_function, compute_anomaly_map, compute_anomaly_score, create_directory_structure
+from utils import create_directory_structure
+from metrics import compute_anomaly_map, compute_anomaly_score, loss_function
+from preprocess import denormalize
 
 def train(_class_, args, device):
     wandb.init(project="stable_rad", entity="afauzanaqil", name=f"train_{_class_}")
@@ -40,10 +42,11 @@ def train(_class_, args, device):
         epoch_loss = 0
         epoch_anomaly_scores = []
 
-        for i, (images, labels) in tqdm.tqdm(enumerate(train_dataloader)):
+        for i, (images, masks, labels) in tqdm.tqdm(enumerate(train_dataloader)):
             torch.cuda.empty_cache()
             inputs = images
             inputs = inputs.to(device)
+            masks = masks.to(device)
             
             # Extract latent features using the VAE encoder
             latents = model.encode(inputs).latent_dist.mean.to(device)
@@ -69,7 +72,6 @@ def train(_class_, args, device):
             # Compute anomaly map and score
             anomaly_map = compute_anomaly_map(inputs, outputs)
             anomaly_score = compute_anomaly_score(inputs, outputs)
-            highlighted_image = highlight_anomaly(inputs, outputs, anomaly_map)
 
             # Compute loss between original images and reconstructed outputs
             loss = loss_function(outputs, inputs)
@@ -85,7 +87,7 @@ def train(_class_, args, device):
 
         # Visualize images at the end of each epoch
         save_path = os.path.join(train_output_dirs[_class_], f'{_class_}_epoch_{epoch+1}.png')
-        visualize_reconstruction(inputs, outputs.detach(), anomaly_map.detach(), highlighted_image.detach(), args, save_path)
+        visualize_reconstruction(inputs, outputs.detach(), anomaly_map.detach(), masks, args, save_path)
 
         # Print average loss and anomaly scores for the epoch
         average_loss = epoch_loss / len(train_dataloader)

@@ -4,7 +4,6 @@ import torch
 from test import test
 from train import train 
 from retrieval import retrieval
-# from inferences.test import inf_test
 from utils import setup_seed, get_args
 from setup import timer
 

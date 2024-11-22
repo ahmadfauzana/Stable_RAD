@@ -34,7 +34,7 @@ def retrieval(args):
         np.save(args.save_path + 'db_features_' + item + '.npy', features_db)
         print(f"Features saved to db_features_{item}.npy")
 
-def find_similar_images(query_feature, reference_features):
+def find_similar_images(query_feature, reference_features, similarity_threshold=0.8):
     """
     Finds the most similar feature vector in the reference_features based on cosine similarity.
 
@@ -49,12 +49,18 @@ def find_similar_images(query_feature, reference_features):
     query_feature = query_feature.flatten().reshape(1, -1)  # Shape becomes [1, 4096]
 
     # Flatten the reference features (N, C, H, W) to (N, C*H*W)
-    reference_features_flat = reference_features.reshape(reference_features.shape[0], -1)  # Shape becomes [209, 4*32*32]
+    reference_features_flat = reference_features.reshape(reference_features.shape[0], -1)  # Shape becomes [N, flattened_size]
 
     # Compute cosine similarity between the query feature and all reference features
     similarities = cosine_similarity(query_feature, reference_features_flat)
 
+    # Apply threshold to filter out low-similarity matches (optional)
+    valid_indices = np.where(similarities >= similarity_threshold)[1]
+
     # Find the index of the most similar reference feature
-    idx = np.argmax(similarities)
+    if valid_indices.size > 0:
+        idx = valid_indices[np.argmax(similarities[0, valid_indices])]
+    else:
+        idx = -1  # or any indicator for no valid match
 
     return idx

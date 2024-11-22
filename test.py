@@ -5,14 +5,13 @@ import numpy as np
 from visualize import visualize_reconstruction
 from sklearn.metrics import roc_auc_score
 from retrieval import find_similar_images
+from metrics import compute_anomaly_map, compute_anomaly_score
 from setup import initiate_model, test_data, load_features
-from utils import denormalize, create_directory_structure, compute_anomaly_map, compute_anomaly_score
+from utils import create_directory_structure
+from preprocess import denormalize
 
 def test(_class_, args, device):
-    # Initialize WandB
     wandb.init(project="stable_rad", entity="afauzanaqil", name=f"test_{_class_}")
-    
-    # Log the hyperparameters to WandB
     wandb.config.update(vars(args))
 
     print(f"Testing on {_class_} started")
@@ -33,42 +32,44 @@ def test(_class_, args, device):
     all_labels = []
     anomap_scores = []
     anomaly_scores = []
-    
+
     test_output_dirs = create_directory_structure(args.output_path, args.phase, ckpt_file, args.item_list)
-    dataloader = test_data(args, _class_,)
+    dataloader = test_data(args, _class_)
     reference_features = load_features(_class_, args)
 
     with torch.no_grad():
         for i, (inputs, masks, labels, _) in enumerate(dataloader):
             torch.cuda.empty_cache()
             inputs = inputs.to(device)
+            masks = masks.to(device)
 
             # Extract latent features from the test input using the encoder
-            latents = encoder(inputs).latent_dist.mean  # Latent mean from VAE
+            latents = encoder(inputs).latent_dist.mean
             latents = latents.to(device)
-
             B, C, H, W = latents.shape
-
-            # Flatten latent features
-            latents_flat = latents.view(B, -1)  # Flatten to (B, C*H*W)
+            latents_flat = latents.view(B, -1)
             
-            # Retrieve similar features based on cosine similarity
-            retrieved_features = []
-            for f in latents_flat.cpu().numpy():
-                idx = find_similar_images(f, reference_features)
-                retrieved_features.append(reference_features[idx])
+            # Initialize retrieved features tensor
+            retrieved_features = torch.zeros((B, C, H, W), device=device)
 
-            # Convert retrieved features back to tensor and reshape
-            retrieved_features = np.array(retrieved_features)  # List of arrays to a single array
-            retrieved_features = torch.tensor(retrieved_features, device=device).view(B, C, H, W)  # Reshape back to original
+            # Retrieve similar features
+            for idx, f in enumerate(latents_flat.cpu().numpy()):
+                feature_idx = find_similar_images(f, reference_features)
+                if feature_idx != -1:
+                    retrieved_features[idx] = torch.tensor(reference_features[feature_idx], device=device).view(C, H, W)
+                else:
+                    # If no match is found, keep as zeroed tensor or apply other handling if necessary
+                    retrieved_features[idx] = torch.zeros((C, H, W), device=device)
 
-            # Decode retrieved latent features
-            recon_image = decoder(retrieved_features).sample  # Decode using Stable Diffusion decoder
-            recon_image = denormalize(recon_image, args.mean, args.std)  # Denormalize reconstructed images
+            # Decode and denormalize reconstructed images
+            recon_image = decoder(retrieved_features).sample
+            recon_image = denormalize(recon_image, args.mean, args.std)
 
-            # Compute anomaly map and anomaly score
-            anomaly_map = compute_anomaly_map(inputs, recon_image)
-            anomaly_score = compute_anomaly_score(inputs, recon_image)
+            # Enhanced anomaly map and score calculation
+            anomaly_map = compute_anomaly_map(inputs, recon_image, encoder, 'absolute')
+            anomaly_score = compute_anomaly_score(anomaly_map, inputs, recon_image, 'mean')
+
+            anomaly_score = anomaly_map.mean(dim=[1, 2, 3])
 
             # Extend results
             anomaly_scores.extend(anomaly_score.cpu().numpy())
@@ -77,7 +78,7 @@ def test(_class_, args, device):
             for j in range(inputs.size(0)):
                 save_path = os.path.join(test_output_dirs[_class_], f'{_class_}_{i}{j}.png')
                 visualize_reconstruction(
-                    inputs[j].unsqueeze(0),  # Add batch dimension for each image
+                    inputs[j].unsqueeze(0),
                     recon_image[j].unsqueeze(0),
                     anomaly_map[j].unsqueeze(0),
                     masks[j].unsqueeze(0),
@@ -86,16 +87,17 @@ def test(_class_, args, device):
                 )            
                 wandb.log({"output_images": wandb.Image(save_path)})
 
-            # Compute ROC AUC score for anomaly detection
+            # Calculate ROC AUC scores for the anomaly map and score
             gt_mask = masks.cpu().numpy().astype(int)
             pred_ano_map = anomaly_map.cpu().numpy()
 
             for b in range(inputs.size(0)):
                 if np.unique(gt_mask[b]).size > 1:
                     anomap_score = roc_auc_score(gt_mask[b].reshape(-1), pred_ano_map[b].reshape(-1))
+                    print(f"Pixel-wise Anomaly Score of {b}: {anomap_score}")
                     anomap_scores.append(anomap_score)
-            
-    # Compute AUROC score
+
+    # Compute and log AUROC
     anomap_scores = np.array(anomap_scores)
     anomaly_scores = np.array(anomaly_scores)
     all_labels = np.array(all_labels)
@@ -103,19 +105,18 @@ def test(_class_, args, device):
     pixel_wise = np.mean(anomap_scores) if len(anomap_scores) > 0 else None
     image_wise = roc_auc_score(all_labels, anomaly_scores)
     
-    # Log AUROC scores to WandB and MLflow
     wandb.log({"pixel-wise auroc": pixel_wise, "image-wise auroc": image_wise})
-    
-    # Save the scores to a file
+
+    # Save the scores
     with open(args.score_path, 'a') as file:
         if os.path.exists(ckpt_file):
             file.write(f'{_class_} class with Checkpoint, Pixel-wise AUROC: {pixel_wise}, Image-wise Score: {image_wise}\n')
         else:
             file.write(f'{_class_} class with Retrieval Only, Pixel-wise AUROC: {pixel_wise}, Image-wise Score: {image_wise}\n')
-            
+
     print(f'Pixel-wise AUROC = {pixel_wise}')
     print(f'Image-wise AUROC = {image_wise}')
     print(f"Testing on {_class_} finished")
-
-    # End WandB
     wandb.finish()
+
+# Update for 71, 77 AUROC 
