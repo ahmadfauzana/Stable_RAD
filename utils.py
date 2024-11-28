@@ -13,32 +13,6 @@ def setup_seed(seed):
     random.seed(seed)
     torch.backends.cudnn.deterministic = True
 
-def compute_anomaly_score(original, reconstructed):
-    """Calculate the mean squared error between the original and reconstructed images."""
-    return torch.mean((original - reconstructed) ** 2, dim=[1, 2, 3])
-
-def compute_anomaly_map(original, reconstructed):
-    """Calculate the absolute difference between original and reconstructed images and reduce to a single channel."""
-    anomaly_map = torch.abs(original - reconstructed)
-    anomaly_map = torch.mean(anomaly_map, dim=1, keepdim=True)
-    anomaly_map = F.interpolate(anomaly_map, size=original.shape[2:], mode='bilinear', align_corners=False)
-    return anomaly_map
-
-def loss_function(a, b):
-    mse_loss = torch.nn.MSELoss()
-    cos_loss = torch.nn.CosineSimilarity()
-
-    # Ensure that `a` and `b` are tensors
-    assert isinstance(a, torch.Tensor), f"Expected tensor, got {type(a)}"
-    assert isinstance(b, torch.Tensor), f"Expected tensor, got {type(b)}"
-
-    # Compute the loss
-    loss = sum(
-        0.1 * mse_loss(a_item, b_item) + torch.mean(1 - cos_loss(a_item.view(a_item.shape[0], -1), b_item.view(b_item.shape[0], -1)))
-        for a_item, b_item in zip(a, b)
-    )
-    return loss
-
 def create_directory_structure(output_dir, phase, ckpt_file, item_list):
     """
     Creates the directory structure and returns the path to store the visualization.
@@ -79,14 +53,6 @@ def create_directory_structure(output_dir, phase, ckpt_file, item_list):
         output_dirs[item] = item_dir
     
     return output_dirs
-
-def denormalize(tensor, mean, std):
-    """
-    Denormalize a tensor using the given mean and std.
-    """
-    mean = torch.tensor(mean).view(1, 3, 1, 1).to(tensor.device)
-    std = torch.tensor(std).view(1, 3, 1, 1).to(tensor.device)
-    return tensor * std + mean
 
 def get_args():
     parser = argparse.ArgumentParser(description="Anomaly Detection Configuration")
