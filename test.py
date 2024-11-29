@@ -66,35 +66,36 @@ def test(_class_, args, device):
             recon_image = denormalize(recon_image, args.mean, args.std)
 
             # Enhanced anomaly map and score calculation
-            feature_anomaly_map = compute_anomaly_map(inputs, recon_image, encoder, 'absolute')
-            feature_anomaly_score = compute_anomaly_score(feature_anomaly_map, inputs, recon_image, 'mean')
+            feature_anomaly_map, pixel_anomaly_map = compute_anomaly_map(inputs, recon_image, encoder)
+            feature_anomaly_score = compute_anomaly_score(feature_anomaly_map)
             
             # Extend results
             feature_anomaly_scores.extend(feature_anomaly_score.cpu().numpy())
             all_labels.extend(labels.cpu().numpy().astype(int))
 
+            # Calculate ROC AUC scores for the anomaly map and score
+            gt_mask = masks.cpu().numpy().astype(int)
+            feature_ano_map = feature_anomaly_map.cpu().numpy()
+            
             for j in range(inputs.size(0)):
                 save_path = os.path.join(test_output_dirs[_class_], f'{_class_}_{i}{j}.png')
                 visualize_reconstruction(
                     inputs[j].unsqueeze(0),
                     recon_image[j].unsqueeze(0),
                     feature_anomaly_map[j].unsqueeze(0),
+                    pixel_anomaly_map[j].unsqueeze(0),
                     masks[j].unsqueeze(0),
                     args,
                     save_path
-                )            
+                )
+
+                if np.unique(gt_mask[j]).size > 1:
+                    feat_anomap_score = roc_auc_score(gt_mask[j].reshape(-1), feature_ano_map[j].reshape(-1))
+                    print(f"Feature-Level Anomaly Score of {i}{j}: {feat_anomap_score}")
+                    feature_anomap_scores.append(feat_anomap_score)    
+
                 wandb.log({"output_images": wandb.Image(save_path)})
 
-            # Calculate ROC AUC scores for the anomaly map and score
-            gt_mask = masks.cpu().numpy().astype(int)
-            feature_ano_map = feature_anomaly_map.cpu().numpy()
-            
-            for b in range(inputs.size(0)):
-                if np.unique(gt_mask[b]).size > 1:
-                    feat_anomap_score = roc_auc_score(gt_mask[b].reshape(-1), feature_ano_map[b].reshape(-1))
-                    print(f"Feature-Level Anomaly Score of {b}: {feat_anomap_score}")
-                    feature_anomap_scores.append(feat_anomap_score)
-                    
     # Compute and log AUROC
     feature_anomap_scores = np.array(feature_anomap_scores)
     feature_anomaly_scores = np.array(feature_anomaly_scores)
@@ -103,7 +104,7 @@ def test(_class_, args, device):
     feature_wise = np.mean(feature_anomap_scores) if len(feature_anomap_scores) > 0 else None
     feature_image_wise = roc_auc_score(all_labels, feature_anomaly_scores)
     
-    wandb.log({"feature-wise": feature_wise, "feature image-wise auroc": feature_image_wise})
+    wandb.log({"feature-wise": feature_wise, "feature-image-wise auroc": feature_image_wise})
 
     # Save the scores
     with open(args.score_path, 'a') as file:

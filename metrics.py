@@ -3,106 +3,7 @@ import torch.nn.functional as F
 from sklearn.metrics import roc_auc_score
 from preprocess import adaptive_threshold
 
-def compute_anomaly_map(inputs, reconstructions, encoder, method='absolute'):
-    """
-    Compute pixel-wise anomaly maps.
-
-    Args:
-        inputs (torch.Tensor): Original input images [B, C, H, W].
-        reconstructions (torch.Tensor): Reconstructed images [B, C, H, W].
-        method (str): Distance metric to use ('L1', 'L2', or 'SSIM').
-        normalize (bool): Whether to normalize the anomaly map.
-
-    Returns:
-        torch.Tensor: Pixel-wise anomaly map [B, H, W].
-    """
-   
-    if method == 'absolute':
-        anomaly_map = compute_absolute_anomaly_map(inputs, reconstructions, encoder)
-    else:
-        raise ValueError(f"Unknown method: {method}")
-
-    return anomaly_map
-
-def compute_anomaly_score(anomaly_map, original, reconstructed, method='mean'):
-    """
-    Compute image-wise anomaly score from the pixel-wise anomaly map.
-
-    Args:
-        anomaly_map (torch.Tensor): Pixel-wise anomaly map [B, H, W].
-        method (str): Aggregation method ('mean', 'max', or 'weighted').
-
-    Returns:
-        torch.Tensor: Image-wise anomaly scores [B].
-    """
-    if method == 'mean':
-        # Average anomaly score
-        anomaly_score = anomaly_map.mean(dim=(-1, -2))
-    else:
-        raise ValueError(f"Unknown method: {method}")
-    return anomaly_score
-
-def compute_absolute_anomaly_map(original, reconstructed, encoder):
-    def compute_feature_anomaly_map(original, reconstructed, encoder, multi_scale=True):
-        """
-        Compute feature-level anomaly map with advanced multi-scale and hierarchical improvements.
-        """
-        def resize_to_match(source, target):
-            """Resize source tensor to match target spatial dimensions."""
-            return F.interpolate(source, size=target.shape[2:], mode='bilinear', align_corners=False)
-
-        # Extract normalized latent features (per channel)
-        orig_features = F.normalize(encoder(original).latent_dist.mean, dim=1)
-        recon_features = F.normalize(encoder(reconstructed).latent_dist.mean, dim=1)
-
-        # Compute absolute residual features (difference between original and reconstructed features)
-        residual_features = torch.abs(orig_features - recon_features)
-        
-        # L2 norm of the residual features to get the primary feature anomaly map
-        feature_anomaly_map = torch.norm(residual_features, p=2, dim=1, keepdim=True)
-        feature_anomaly_map = resize_to_match(feature_anomaly_map, original)
-
-        # If multi-scale is enabled, refine the feature anomaly map using multiple scales
-        if multi_scale:
-            scales = [0.25, 0.5, 1.0, 2.0, 4.0]
-            scale_weights = torch.tensor([0.1, 0.2, 0.3, 0.2, 0.2], device=original.device)
-            scale_weights = scale_weights.view(-1, 1, 1, 1)  # Match dimensions
-
-            multi_scale_maps = []
-            for i, scale in enumerate(scales):
-                # Rescale images and recompute residuals at different scales
-                scaled_original = F.interpolate(original, scale_factor=scale, mode='bilinear', align_corners=False)
-                scaled_reconstructed = F.interpolate(reconstructed, scale_factor=scale, mode='bilinear', align_corners=False)
-
-                # Extract features and compute residuals at each scale
-                scaled_orig_features = F.normalize(encoder(scaled_original).latent_dist.mean, dim=1)
-                scaled_recon_features = F.normalize(encoder(scaled_reconstructed).latent_dist.mean, dim=1)
-                scaled_residual = torch.abs(scaled_orig_features - scaled_recon_features)
-
-                # Compute the feature anomaly map for each scale
-                scaled_map = torch.norm(scaled_residual, p=2, dim=1, keepdim=True)
-                scaled_map = resize_to_match(scaled_map, original)
-
-                # Weight the maps according to their scale importance
-                weighted_map = scaled_map * scale_weights[i]
-                multi_scale_maps.append(weighted_map)
-
-            # Aggregate multi-scale anomaly maps
-            feature_anomaly_map = torch.sum(torch.stack(multi_scale_maps, dim=0), dim=0)
-
-        # Attention mechanism to highlight more prominent anomaly regions
-        patch_size = 16
-        attention = F.adaptive_avg_pool2d(feature_anomaly_map, (patch_size, patch_size))
-        attention = F.interpolate(attention, size=feature_anomaly_map.shape[2:], mode='bilinear', align_corners=False)
-        attention = torch.sigmoid(attention)
-        feature_anomaly_map *= attention
-
-        # Dynamic scaling of the feature anomaly map with more emphasis on stronger anomalies
-        dynamic_alpha = feature_anomaly_map.mean() + 1.5 * feature_anomaly_map.std()
-        dynamic_alpha = torch.clamp(dynamic_alpha, min=1.0, max=3.0)  # Ensure dynamic_alpha stays within reasonable bounds
-        feature_anomaly_map = torch.log1p(feature_anomaly_map * dynamic_alpha)
-
-        return feature_anomaly_map
+def compute_anomaly_map(original, reconstructed, encoder):
 
     feature_anomaly_map = compute_feature_anomaly_map(original, reconstructed, encoder, multi_scale=True)
     
@@ -113,14 +14,70 @@ def compute_absolute_anomaly_map(original, reconstructed, encoder):
     
     return feature_anomaly_map, pixel_anomaly_map
 
-# Compute AUROC (pixel-wise)
-def compute_pixel_auroc(pred, ground_truth):
-    return roc_auc_score(ground_truth.cpu().numpy().astype(int), pred.cpu().numpy())
+def compute_anomaly_score(anomaly_map):
+    anomaly_score = anomaly_map.mean(dim=(-1, -2))
+    return anomaly_score
 
-# Compute Image-wise AUROC using adaptive threshold
-def compute_image_auroc(anomaly_map, ground_truth):
-    thresholded_map = adaptive_threshold(anomaly_map)
-    return compute_pixel_auroc(thresholded_map, ground_truth)
+def compute_feature_anomaly_map(original, reconstructed, encoder, multi_scale=True):
+    """
+    Compute feature-level anomaly map with advanced multi-scale and hierarchical improvements.
+    """
+    def resize_to_match(source, target):
+        """Resize source tensor to match target spatial dimensions."""
+        return F.interpolate(source, size=target.shape[2:], mode='bilinear', align_corners=False)
+
+    # Extract normalized latent features (per channel)
+    orig_features = F.normalize(encoder(original).latent_dist.mean, dim=1)
+    recon_features = F.normalize(encoder(reconstructed).latent_dist.mean, dim=1)
+
+    # Compute absolute residual features (difference between original and reconstructed features)
+    residual_features = torch.abs(orig_features - recon_features)
+    
+    # L2 norm of the residual features to get the primary feature anomaly map
+    feature_anomaly_map = torch.norm(residual_features, p=2, dim=1, keepdim=True)
+    feature_anomaly_map = resize_to_match(feature_anomaly_map, original)
+
+    # If multi-scale is enabled, refine the feature anomaly map using multiple scales
+    if multi_scale:
+        scales = [0.25, 0.5, 1.0, 2.0, 4.0]
+        scale_weights = torch.tensor([0.1, 0.2, 0.3, 0.2, 0.2], device=original.device)
+        scale_weights = scale_weights.view(-1, 1, 1, 1)  # Match dimensions
+
+        multi_scale_maps = []
+        for i, scale in enumerate(scales):
+            # Rescale images and recompute residuals at different scales
+            scaled_original = F.interpolate(original, scale_factor=scale, mode='bilinear', align_corners=False)
+            scaled_reconstructed = F.interpolate(reconstructed, scale_factor=scale, mode='bilinear', align_corners=False)
+
+            # Extract features and compute residuals at each scale
+            scaled_orig_features = F.normalize(encoder(scaled_original).latent_dist.mean, dim=1)
+            scaled_recon_features = F.normalize(encoder(scaled_reconstructed).latent_dist.mean, dim=1)
+            scaled_residual = torch.abs(scaled_orig_features - scaled_recon_features)
+
+            # Compute the feature anomaly map for each scale
+            scaled_map = torch.norm(scaled_residual, p=2, dim=1, keepdim=True)
+            scaled_map = resize_to_match(scaled_map, original)
+
+            # Weight the maps according to their scale importance
+            weighted_map = scaled_map * scale_weights[i]
+            multi_scale_maps.append(weighted_map)
+
+        # Aggregate multi-scale anomaly maps
+        feature_anomaly_map = torch.sum(torch.stack(multi_scale_maps, dim=0), dim=0)
+
+    # Attention mechanism to highlight more prominent anomaly regions
+    patch_size = 16
+    attention = F.adaptive_avg_pool2d(feature_anomaly_map, (patch_size, patch_size))
+    attention = F.interpolate(attention, size=feature_anomaly_map.shape[2:], mode='bilinear', align_corners=False)
+    attention = torch.sigmoid(attention)
+    feature_anomaly_map *= attention
+
+    # Dynamic scaling of the feature anomaly map with more emphasis on stronger anomalies
+    dynamic_alpha = feature_anomaly_map.mean() + 1.5 * feature_anomaly_map.std()
+    dynamic_alpha = torch.clamp(dynamic_alpha, min=1.0, max=3.0)  # Ensure dynamic_alpha stays within reasonable bounds
+    feature_anomaly_map = torch.log1p(feature_anomaly_map * dynamic_alpha)
+
+    return feature_anomaly_map
 
 def loss_function(a, b):
     mse_loss = torch.nn.MSELoss()
