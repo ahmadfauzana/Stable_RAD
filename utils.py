@@ -77,7 +77,7 @@ def get_args():
     parser.add_argument('--std', nargs='+', type=float, default=[0.5, 0.5, 0.5], help="Standard deviation normalization for training")
     
     # Paths
-    parser.add_argument('--root_path', type=str, default="D:\\Fauzan\\StudyPhD\\Research\\Stable_RAD\\dataset\\", help="Root path for dataset")
+    parser.add_argument('--root_path', type=str, default="D:\\Fauzan\\StudyPhD\\Research\\Dataset\\mvtec\\", help="Root path for dataset")
     parser.add_argument('--ckpt_path', type=str, default="D:\\Fauzan\\StudyPhD\\Research\\Stable_RAD\\checkpoint\\", help="Checkpoint path")
     parser.add_argument('--save_path', type=str, default="D:\\Fauzan\\StudyPhD\\Research\\Stable_RAD\\features\\", help="Save image features path")
     parser.add_argument('--output_path', type=str, default="D:\\Fauzan\\StudyPhD\\Research\\Stable_RAD\\output\\", help="Output visualization path")
